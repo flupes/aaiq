@@ -91,3 +91,11 @@ This includes the e-Paper driver from WaveShare and a fork of the great Adafruit
 Other "normal" dependencies are installed with PlatformIO:
   - ArduinoJson + StreamUtils from bblanchon
 
+## Configuration
+
+You should set the wifi SSID and password in `src/credentials.h`.
+This is also where you need to add your own PurpleAir API READ key.
+
+Note: Purple Air now requires individual keys to access the sensor database.
+Check
+[this post](https://community.purpleair.com/t/making-api-calls-with-the-purpleair-api/180) regarding the topic.
