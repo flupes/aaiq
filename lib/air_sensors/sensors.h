@@ -4,54 +4,30 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-class WiFiClient;
+// Forward declaration
 class HTTPClient;
 
-const size_t kMaxSensors = 8;
+const size_t kMaxSensors = 9;
 
-// Purple air sensors ID by priority.
-static const size_t kSensorIds[] = {59927, 65489, 67415, 25301, 54857, 36667};
-
-enum PmAvgIndexes {
-  TenMinutes,
-  ThirtyMinutes,
-  OneHour,
-  SixHours,
-  TwentyFourHours,
-  OneWeek,
-  PmAvgSize
-};
+// Custom group of sensors to use
+static const size_t kSensorGroupId = 1309;
 
 struct SensorData {
   size_t id;
-  uint32_t timestamp;
-  float pm_2_5_A;
-  float pm_2_5_B;
-  float pressure;
-  float averages[PmAvgIndexes::PmAvgSize];
-  int16_t age_A;
-  int16_t age_B;
   int16_t temperature;
   int16_t humidity;
+  float pressure;
+  float pm_2_5_10min;
 };
 
 class AirSensors {
  public:
-  AirSensors() : sensorsCount_(0) {
+  AirSensors() : sensorsCount_(0), timestamp_(0) {
     noData_.id = 0;
-    noData_.timestamp = 0;
   }
 
-  bool AddSensor(size_t sid) {
-    if (sensorsCount_ < kMaxSensors) {
-      sensorIds_[sensorsCount_++] = sid;
-      return true;
-    }
-    return false;
-  }
-
-  bool UpdateData(WiFiClient &client, HTTPClient &http);
-
+  bool UpdateData(const char* key);
+  
   void PrintAllData() {
     for (size_t index = 0; index < sensorsCount_; index++) {
       PrintSensorData(sensorsData_[index]);
@@ -70,22 +46,13 @@ class AirSensors {
 
   size_t Count() const { return sensorsCount_; }
 
- protected:
-  size_t GetSensorIndex(size_t sid) {
-    size_t index = SIZE_MAX;
-    for (size_t i = 0; i < sensorsCount_; i++) {
-      if (sensorIds_[i] == sid) {
-        index = i;
-        break;
-      }
-    }
-    return index;
-  }
+  uint32_t Timestamp() const { return timestamp_; }
 
+ protected:
   size_t ParseSensors(HTTPClient &http);
 
   size_t sensorsCount_;
-  size_t sensorIds_[kMaxSensors];
+  uint32_t timestamp_;
   SensorData noData_;
   SensorData sensorsData_[kMaxSensors];
 };

@@ -3,8 +3,9 @@
 #include <Adafruit_GFX.h>
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
 #include <time.h>
 
 #include "Fonts/ClearSans-Bold-48pt7b.h"
@@ -30,7 +31,9 @@ FlashSamples<AirSampleData> gFlashSamples(gFlash, 0xA000);
 // voltage (instean of the analog input pin)
 ADC_MODE(ADC_VCC);
 
-const time_t kTimeZoneOffsetSeconds = -7 * 3600;
+const int kDstOn = 0;
+const int kGmtOffset = -8;
+const time_t kTimeZoneOffsetSeconds = (kDstOn + kGmtOffset) * 3600;
 
 enum class ColorBuffer : uint8_t { Black = 0, Red = 1 };
 
@@ -62,12 +65,10 @@ void setup() {
 
   gFlashSamples.Begin();
   printf("nb of sectors in use : %d\n", gFlashSamples.SectorsInUse());
-  printf("first addr of reserved : 0x%08X\n",
-         gFlashSamples.FlashStorageStart());
+  printf("first addr of reserved : 0x%08X\n", gFlashSamples.FlashStorageStart());
   printf("end of reserved flash  : 0x%08X\n", gFlashSamples.FlashStorageEnd());
   printf("nominal number of samples : %d\n", gFlashSamples.NominalCapacity());
-  printf("current number of samples stored : %d\n",
-         gFlashSamples.NumberOfSamples());
+  printf("current number of samples stored : %d\n", gFlashSamples.NumberOfSamples());
 
   // Wiped flash in 4986 ms
   // nb of sectors in use : 160
@@ -112,20 +113,12 @@ void setup() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println();
     Serial.println("WiFi Connected :-)");
-    WiFiClient client;
-    HTTPClient http;
 
     AirSensors sensors;
-    for (size_t i = 0; i < sizeof(kSensorIds) / sizeof(size_t); i++) {
-      sensors.AddSensor(kSensorIds[i]);
-    }
     Serial.println("Update data");
-    sensors.UpdateData(client, http);
+    sensors.UpdateData(PA_READ_KEY);
     Serial.println("List of sensors");
     sensors.PrintAllData();
-
-    // Disconnect
-    http.end();
 
     Serial.print("Memory heap before Canvas = ");
     Serial.println(ESP.getFreeHeap());
@@ -192,37 +185,10 @@ void setup() {
         canvas[1]->fillRoundRect(28, 134, EPD_WIDTH - 2 * 28, 24, 6, COLORED);
         canvas[1]->fillRoundRect(30, 136, EPD_WIDTH - 2 * 30, 20, 4, UNCOLORED);
       }
-      sprintf(msg, "MAE=%.1f / #%d/%d", sample.MaeValue(), primaryIndex+1, sample.SamplesCount());
+      sprintf(msg, "MAE=%.1f / #%d/%d", sample.MaeValue(), primaryIndex + 1, sample.SamplesCount());
       CenterText(&ClearSans_Medium12pt7b, msg, 152);
 
 #if 0
-      sprintf(msg, "MAE = %.1f", sample.MaeValue());
-      CenterText(&ClearSans_Medium12pt7b, msg, 152);
-
-      sprintf(msg, "%d sensors (#%d)", sample.SamplesCount(), primaryIndex + 1);
-      CenterText(&ClearSans_Medium12pt7b, msg, 184);
-
-      SensorData data = sensors.Data(primaryIndex);
-      int16_t value30m, value1h, value6h, value24h;
-      AqiLevel level;
-      pm25_to_aqi(data.averages[static_cast<int>(PmAvgIndexes::ThirtyMinutes)],
-                  value30m, level);
-      pm25_to_aqi(data.averages[static_cast<int>(PmAvgIndexes::OneHour)],
-                  value1h, level);
-      pm25_to_aqi(data.averages[static_cast<int>(PmAvgIndexes::SixHours)],
-                  value6h, level);
-      pm25_to_aqi(
-          data.averages[static_cast<int>(PmAvgIndexes::TwentyFourHours)],
-          value24h, level);
-      sprintf(msg, "avg. 30min = %d", value30m);
-      CenterText(&ClearSans_Medium12pt7b, msg, 208);
-
-      sprintf(msg, "1h=%d / 6h=%d", value1h, value6h);
-      CenterText(&ClearSans_Medium12pt7b, msg, 228);
-
-      // sprintf(msg, "avg. 24h = %d", value24h);
-      // CenterText(&ClearSans_Medium12pt7b, msg, 248);
-
       uint16_t vcc = ESP.getVcc();
       Serial.print("VCC = ");
       Serial.println(vcc);
@@ -243,13 +209,12 @@ void setup() {
 
   GraphSamples graph(10 * 60);
   graph.Fill(gFlashSamples, seconds, pm25_to_aqi_value);
-  for (size_t i=0; i<graph.Length(); i+=14) {
+  for (size_t i = 0; i < graph.Length(); i += 14) {
     printf("sample #%d : %d\n", i, graph.Value(i));
   }
   graph.Draw(canvas[0], canvas[1]);
 
-  epd.TransmitPartial(canvas[0]->getBuffer(), canvas[1]->getBuffer(), 0, 0,
-                      EPD_WIDTH, EPD_HEIGHT);
+  epd.TransmitPartial(canvas[0]->getBuffer(), canvas[1]->getBuffer(), 0, 0, EPD_WIDTH, EPD_HEIGHT);
   epd.DisplayFrame();
 
   Serial.println("Put display to sleep");

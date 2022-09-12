@@ -28,7 +28,7 @@ void GraphSamples::Labels() {
   // legend
   uint32 hourPeriod = length_ * period_ / 3600;
   printf("period in hours = %d\n", hourPeriod);
-  char msg[3];
+  char msg[8];
   if (hourPeriod < 100) {
     int16_t base = EPD_HEIGHT - 52;
     blackCanvas_->setCursor(EPD_WIDTH - 11, base + 8);
