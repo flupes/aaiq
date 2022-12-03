@@ -33,14 +33,14 @@ bool AirSensors::UpdateData(const char *key) {
 
   http.begin(*client, url);
 
-  Serial.print("Memory heap after before https.begin() = ");
+  Serial.print("Memory heap after https.begin() = ");
   Serial.println(ESP.getFreeHeap());
 
   http.addHeader("X-API-Key", key);
   http.GET();
-
   Serial.print("Retrieve data time (ms) = ");
   Serial.println(millis() - start);
+  // Serial.print(http.getStream());
 
   size_t count = ParseSensors(http);
 
