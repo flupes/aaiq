@@ -3,8 +3,8 @@
 #include <Adafruit_GFX.h>
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
 #include <WiFiClientSecureBearSSL.h>
 #include <time.h>
 
@@ -109,31 +109,36 @@ void setup() {
     last.FromData(data);
     seconds = last.Seconds();
   }
+  char datetime[16];
 
+  AirSensors sensors;
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println();
     Serial.println("WiFi Connected :-)");
 
-    AirSensors sensors;
-    Serial.println("Update data");
+    Serial.println("Update data...");
     sensors.UpdateData(PA_READ_KEY);
     Serial.println("List of sensors");
     sensors.PrintAllData();
+  }
 
-    Serial.print("Memory heap before Canvas = ");
-    Serial.println(ESP.getFreeHeap());
-    canvas[0] = new GFXcanvas1(EPD_WIDTH, EPD_HEIGHT);
-    canvas[1] = new GFXcanvas1(EPD_WIDTH, EPD_HEIGHT);
-    Serial.print("Memory heap after Canvas = ");
-    Serial.println(ESP.getFreeHeap());
+  // We cannot simply move this block before the wifi sensor data parsing because of memory
+  // limitations!
+  Serial.print("Memory heap before Canvas = ");
+  Serial.println(ESP.getFreeHeap());
+  canvas[0] = new GFXcanvas1(EPD_WIDTH, EPD_HEIGHT);
+  canvas[1] = new GFXcanvas1(EPD_WIDTH, EPD_HEIGHT);
+  Serial.print("Memory heap after Canvas = ");
+  Serial.println(ESP.getFreeHeap());
 
-    for (uint8_t i = 0; i < 2; i++) {
-      canvas[i]->fillScreen(UNCOLORED);
-      canvas[i]->setTextColor(COLORED);
-      canvas[i]->setTextSize(1);
-      canvas[i]->setTextWrap(false);
-    }
+  for (uint8_t i = 0; i < 2; i++) {
+    canvas[i]->fillScreen(UNCOLORED);
+    canvas[i]->setTextColor(COLORED);
+    canvas[i]->setTextSize(1);
+    canvas[i]->setTextWrap(false);
+  }
 
+  if (!timeout && WiFi.status() == WL_CONNECTED) {
     AirSample sample;
     int32_t primaryIndex;
     size_t nbSamples = ComputeStats(sensors, sample, primaryIndex);
@@ -159,9 +164,7 @@ void setup() {
       Serial.print(date);
       Serial.print(" - ");
       Serial.println(stamp);
-      char datetime[16];
       strftime(datetime, 16, "%b %d, %H:%M", local);
-
       CenterText(&ClearSans_Medium12pt7b, datetime, 18);
 
       int16_t aqi = sample.AqiPm_2_5();
@@ -200,11 +203,18 @@ void setup() {
       Serial.println("No valid air sample retrieved :-/");
       CenterText(&ClearSans_Medium18pt7b, "No Data :-/", 132);
     }
-
   } else {
     // not connected, too bad :-(
     Serial.println("Could not connected to WiFi :-(");
     CenterText(&ClearSans_Medium18pt7b, "No WiFi :-(", 132);
+
+    // seconds was initialized to last sample at the very begining
+    time_t localSeconds = seconds + kTimeZoneOffsetSeconds;
+    tm *local = gmtime(&localSeconds);
+    strftime(datetime, 16, "%b %d, %H:%M", local);
+    CenterText(&ClearSans_Medium12pt7b, "last sample", 18);
+    CenterText(&ClearSans_Medium12pt7b, "retrieved at:", 36);
+    CenterText(&ClearSans_Medium12pt7b, datetime, 54);
   }
 
   GraphSamples graph(10 * 60);
